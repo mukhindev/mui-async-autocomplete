@@ -220,13 +220,21 @@ export default function AsyncAutocomplete<
         return (
           <li {...liProps} key={id}>
             {multiple && (
-              <Checkbox
+              <Box
                 key={id}
-                name="checkbox"
-                edge="start"
-                size="small"
-                checked={selected}
-              />
+                sx={{
+                  height: 0,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <Checkbox
+                  name="checkbox"
+                  edge="start"
+                  size="small"
+                  checked={selected}
+                />
+              </Box>
             )}
             {props.getOptionLabel?.(option)}
           </li>
