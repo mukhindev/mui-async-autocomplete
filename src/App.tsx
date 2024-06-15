@@ -1,7 +1,7 @@
 import AsyncAutocomplete, {
   OptionsRequestParams,
 } from "./shared/ui/AsyncAutocomplete";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Stack } from "@mui/material";
 
 type TodoModel = {
@@ -29,7 +29,9 @@ const customValue2 = {
 export default function App() {
   const [value, setValue] = useState<TodoModel | null>(customValue1);
   const [values, setValues] = useState<TodoModel[]>([customValue1, customValue2]); // prettier-ignore
-  const [optionsCache, setOptionsCache] = useState<TodoModel[]>();
+  const optionsCache = useRef<TodoModel[]>();
+  const lastCacheTimestamp = useRef<number>();
+  const [simpleValue, setSimpleValue] = useState<string | null>("Я");
 
   // Запрос опций
   const handleOptionsRequest = async ({
@@ -37,8 +39,12 @@ export default function App() {
     signal,
   }: OptionsRequestParams) => {
     // Забрать из кеша, если он есть и это не запрос на поиск
-    if (optionsCache && !search) {
-      return optionsCache;
+    if (
+      lastCacheTimestamp.current &&
+      Date.now() - lastCacheTimestamp.current < 60 * 1000 &&
+      !search
+    ) {
+      return optionsCache.current;
     }
 
     const res = await fetch(
@@ -48,9 +54,13 @@ export default function App() {
 
     const options = await res.json();
 
+    // Имитация долгого запроса
+    await delay(2000);
+
     // Сохранить в кеш если не запрос на поиск
     if (!search) {
-      setOptionsCache(options);
+      optionsCache.current = options;
+      lastCacheTimestamp.current = Date.now();
     }
 
     return options;
@@ -78,9 +88,25 @@ export default function App() {
         value={values}
         getOptionLabel={(option) => option.title}
         isOptionEqualToValue={(option, value) => option.title === value.title}
+        getOptionKey={(option) => option.id}
         onOptionsRequest={handleOptionsRequest}
         onChange={(_, value) => setValues(value)}
       />
+      <AsyncAutocomplete
+        name="simple"
+        label="Простое значение"
+        size="small"
+        sx={{ width: 240 }}
+        value={simpleValue}
+        options={["A", "Б", "В"]}
+        getOptionLabel={(option) => option}
+        isOptionEqualToValue={(option, value) => option === value}
+        onChange={(_, value) => setSimpleValue(value)}
+      />
     </Stack>
   );
+}
+
+function delay(duration = 1000) {
+  return new Promise((resolve) => setTimeout(resolve, duration));
 }

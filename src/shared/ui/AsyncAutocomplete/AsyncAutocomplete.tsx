@@ -1,6 +1,23 @@
-import { Autocomplete, AutocompleteProps } from "@mui/material";
-import RenderInput from "./components/RenderInput";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Autocomplete,
+  AutocompleteProps,
+  AutocompleteRenderInputParams,
+  Box,
+  Checkbox,
+  CircularProgress,
+  IconButton,
+  IconButtonProps,
+  TextField,
+} from "@mui/material";
+import {
+  ForwardedRef,
+  forwardRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 export type OptionsRequestParams = {
   name?: string;
@@ -24,6 +41,7 @@ interface AsyncAutocompleteProps<
   name?: string;
   label?: string;
   placeholder?: string;
+  inProgress?: string;
   onOptionsRequest?: OptionsRequest<T>;
 }
 
@@ -44,6 +62,7 @@ export default function AsyncAutocomplete<
     value,
     multiple,
     isOptionEqualToValue,
+    inProgress,
     onInputChange,
     onOpen,
     onOptionsRequest,
@@ -55,6 +74,7 @@ export default function AsyncAutocomplete<
   const [requestedOptions, setRequestedOptions] = useState<T[]>([]);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
+  const [isRequestInProgress, setIsRequestInProgress] = useState(false);
 
   /** Микс из опций обычный, запрошенных и отсутствующих (текущие значения вне опций) */
   const mixedOptions = useMemo(() => {
@@ -85,38 +105,50 @@ export default function AsyncAutocomplete<
     return propsAndRequestedOptions;
   }, [value, options, requestedOptions, isOptionEqualToValue]);
 
+  const onOptionsRequestRef = useRef(onOptionsRequest);
+  onOptionsRequestRef.current = onOptionsRequest;
+
   /** Асинхронное или синхронное получение дополнительных опций */
-  const handleOptionsRequest = async (params: { search: string }) => {
-    if (!onOptionsRequest) {
-      return;
-    }
+  const handleOptionsRequest = useCallback(
+    async (params: { search: string }) => {
+      const onOptionsRequest = onOptionsRequestRef.current;
 
-    const { search } = params;
-
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
-
-    try {
-      const requestedOptions = await onOptionsRequest({
-        name,
-        search: search ? search : undefined,
-        signal: abortControllerRef.current?.signal,
-      });
-
-      if (requestedOptions) {
-        setRequestedOptions(requestedOptions);
+      if (!onOptionsRequest) {
+        return;
       }
-    } catch {
-      /* empty */
-    }
-  };
+
+      const { search } = params;
+
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = new AbortController();
+
+      try {
+        setIsRequestInProgress(true);
+
+        const requestedOptions = await onOptionsRequest({
+          name,
+          search: search ? search : undefined,
+          signal: abortControllerRef.current?.signal,
+        });
+
+        if (requestedOptions) {
+          setRequestedOptions(requestedOptions);
+        }
+      } catch {
+        /* empty */
+      } finally {
+        setIsRequestInProgress(false);
+      }
+    },
+    [name],
+  );
 
   /** Запрос дополнительных опций при поиске */
   useEffect(() => {
     if (debouncedSearch) {
       handleOptionsRequest({ search: debouncedSearch });
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, handleOptionsRequest]);
 
   /** Обработка поля ввода */
   const handleInputChange: Props["onInputChange"] = (evt, value, reason) => {
@@ -141,29 +173,93 @@ export default function AsyncAutocomplete<
 
   const handleOpen: Props["onOpen"] = (evt) => {
     onOpen?.(evt);
-    handleOptionsRequest({ search: "" });
+
+    if (!isRequestInProgress) {
+      handleOptionsRequest({ search: "" });
+    }
   };
 
-  return (
-    <Autocomplete
-      renderInput={(params) => (
-        <RenderInput
+  const renderInput = useCallback(
+    (params: AutocompleteRenderInputParams) => {
+      return (
+        <TextField
           {...params}
           name={name}
           label={label}
           placeholder={placeholder}
         />
-      )}
+      );
+    },
+    [name, label, placeholder],
+  );
+
+  return (
+    <Autocomplete
+      renderInput={renderInput}
       options={mixedOptions}
+      noOptionsText={
+        isRequestInProgress
+          ? "Загрузка..."
+          : search || debouncedSearch
+            ? "Не найдено"
+            : "Нет опций"
+      }
       multiple={multiple}
+      slotProps={{
+        popupIndicator:
+          inProgress || isRequestInProgress
+            ? { component: IconButtonWithProgress }
+            : undefined,
+      }}
       value={value}
       isOptionEqualToValue={isOptionEqualToValue}
       onInputChange={handleInputChange}
+      renderOption={(params, option, { selected }) => {
+        const { id, ...liProps } = params;
+
+        return (
+          <li {...liProps} key={id}>
+            {multiple && (
+              <Checkbox
+                key={id}
+                name="checkbox"
+                edge="start"
+                size="small"
+                checked={selected}
+              />
+            )}
+            {props.getOptionLabel?.(option)}
+          </li>
+        );
+      }}
       onOpen={handleOpen}
       {...autocompleteProps}
     />
   );
 }
+
+const IconButtonWithProgress = forwardRef(function IconButtonWithProgress(
+  props: IconButtonProps,
+  ref: ForwardedRef<HTMLButtonElement>,
+) {
+  const { children, ...iconButtonProps } = props;
+
+  return (
+    <IconButton {...iconButtonProps} ref={ref} sx={{ position: "relative" }}>
+      {children}
+      <Box
+        sx={{
+          position: "absolute",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <CircularProgress size={20} />
+      </Box>
+    </IconButton>
+  );
+});
 
 /** ==== Utils ==== */
 
