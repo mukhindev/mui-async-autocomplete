@@ -1,6 +1,6 @@
 import { Autocomplete, AutocompleteProps } from "@mui/material";
 import RenderInput from "./components/RenderInput";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type OptionsRequestParams = {
   name?: string;
@@ -86,57 +86,56 @@ export default function AsyncAutocomplete<
   }, [value, options, requestedOptions, isOptionEqualToValue]);
 
   /** Асинхронное или синхронное получение дополнительных опций */
-  const handleOptionsRequest = useCallback(
-    async (params: { search: string }) => {
-      if (!onOptionsRequest) {
-        return;
+  const handleOptionsRequest = async (params: { search: string }) => {
+    if (!onOptionsRequest) {
+      return;
+    }
+
+    const { search } = params;
+
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
+
+    try {
+      const requestedOptions = await onOptionsRequest({
+        name,
+        search: search ? search : undefined,
+        signal: abortControllerRef.current?.signal,
+      });
+
+      if (requestedOptions) {
+        setRequestedOptions(requestedOptions);
       }
-
-      const { search } = params;
-
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = new AbortController();
-
-      try {
-        const requestedOptions = await onOptionsRequest({
-          name,
-          search: search ? search : undefined,
-          signal: abortControllerRef.current?.signal,
-        });
-
-        if (requestedOptions) {
-          setRequestedOptions(requestedOptions);
-        }
-      } catch {
-        /* empty */
-      }
-    },
-    [name, onOptionsRequest],
-  );
+    } catch {
+      /* empty */
+    }
+  };
 
   /** Запрос дополнительных опций при поиске */
   useEffect(() => {
     if (debouncedSearch) {
       handleOptionsRequest({ search: debouncedSearch });
     }
-  }, [debouncedSearch, handleOptionsRequest]);
+  }, [debouncedSearch]);
 
   /** Обработка поля ввода */
   const handleInputChange: Props["onInputChange"] = (evt, value, reason) => {
     onInputChange?.(evt, value, reason);
 
+    // Изменён символ в поле ввода
     if (reason === "input" && value) {
       setSearch(value);
     }
 
+    // Удалён последний символ в поле ввода
     if (reason === "input" && !value) {
       setSearch("");
       handleOptionsRequest({ search: "" });
     }
 
-    if (reason === "reset" && !value) {
+    // Выход из поля
+    if (reason === "reset") {
       setSearch("");
-      handleOptionsRequest({ search: "" });
     }
   };
 

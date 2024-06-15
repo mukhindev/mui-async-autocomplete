@@ -28,14 +28,10 @@ const customValue2 = {
 
 export default function App() {
   const [value, setValue] = useState<TodoModel | null>(customValue1);
-
-  const [values, setValues] = useState<TodoModel[]>([
-    customValue1,
-    customValue2,
-  ]);
-
+  const [values, setValues] = useState<TodoModel[]>([customValue1, customValue2]); // prettier-ignore
   const [optionsCache, setOptionsCache] = useState<TodoModel[]>();
 
+  // Запрос опций
   const handleOptionsRequest = async ({
     search,
     signal,
