@@ -86,6 +86,7 @@ export default function App() {
         size="small"
         sx={{ width: 480 }}
         value={values}
+        disableCloseOnSelect
         getOptionLabel={(option) => option.title}
         isOptionEqualToValue={(option, value) => option.title === value.title}
         getOptionKey={(option) => option.id}

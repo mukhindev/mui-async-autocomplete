@@ -16,6 +16,7 @@ import {
   ForwardedRef,
   forwardRef,
   LiHTMLAttributes,
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -255,76 +256,66 @@ export default function AsyncAutocomplete<
     [name, label, placeholder],
   );
 
-  const renderOption = useCallback(
-    (
-      params: LiHTMLAttributes<HTMLLIElement>,
-      option: T,
-      { selected }: AutocompleteRenderOptionState,
-    ) => {
-      const { id, ...liProps } = params;
+  const renderOption = (
+    params: LiHTMLAttributes<HTMLLIElement>,
+    option: T,
+    { selected }: AutocompleteRenderOptionState,
+  ) => {
+    const { id, ...liProps } = params;
 
-      // Отрисовка служебного элемента списка о создании новой опции
-      if (option === OPTION_CREATE_SYMBOL) {
-        return (
-          <Box
-            key={id}
-            component="li"
-            className={liProps.className}
-            sx={{ cursor: "default !important" }}
-          >
-            <Button
-              variant="outlined"
-              onClick={handleOptionCreate}
-              disabled={inProgress || isRequestInProgress}
-              sx={{
-                textTransform: "inherit",
-                pl: 1,
-                pr: 1,
-                pt: 0.25,
-                pb: 0.25,
-                width: "100%",
-                textAlign: "left",
-                justifyContent: "start",
-              }}
-            >
-              Создать: {search}
-            </Button>
-          </Box>
-        );
-      }
-
+    // Отрисовка служебного элемента списка о создании новой опции
+    if (option === OPTION_CREATE_SYMBOL) {
       return (
-        <Box component="li" {...liProps} key={id}>
-          {multiple && (
-            <Box
-              key={id}
-              sx={{
-                height: 0,
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <Checkbox
-                name="checkbox"
-                edge="start"
-                size="small"
-                checked={selected}
-              />
-            </Box>
-          )}
-          {handleOptionLabel(option)}
+        <Box
+          key={id}
+          component="li"
+          className={liProps.className}
+          sx={{ cursor: "default !important" }}
+        >
+          <Button
+            variant="outlined"
+            onClick={handleOptionCreate}
+            disabled={inProgress || isRequestInProgress}
+            sx={{
+              textTransform: "inherit",
+              pl: 1,
+              pr: 1,
+              pt: 0.25,
+              pb: 0.25,
+              width: "100%",
+              textAlign: "left",
+              justifyContent: "start",
+            }}
+          >
+            Создать: {search}
+          </Button>
         </Box>
       );
-    },
-    [
-      multiple,
-      handleOptionLabel,
-      handleOptionCreate,
-      inProgress,
-      isRequestInProgress,
-      search,
-    ],
-  );
+    }
+
+    return (
+      <Box component="li" {...liProps} key={id}>
+        {multiple && (
+          <Box
+            key={id}
+            sx={{
+              height: 0,
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            {/*
+              Хак для улучшения производительности.
+              У MUI Checkbox плохая производительность.
+              TODO заменить на имитацию MUI Checkbox по дизайну
+             */}
+            {selected ? <MemoizedCheckedCheckbox /> : <MemoizedCheckbox />}
+          </Box>
+        )}
+        {handleOptionLabel(option)}
+      </Box>
+    );
+  };
 
   const handleOptionsFilter: Props["filterOptions"] = (options, state) => {
     const { inputValue } = state;
@@ -378,6 +369,14 @@ export default function AsyncAutocomplete<
     />
   );
 }
+
+const MemoizedCheckbox = memo(function MemoizedCheckbox() {
+  return <Checkbox name="checkbox" edge="start" size="small" />;
+});
+
+const MemoizedCheckedCheckbox = memo(function MemoizedCheckedCheckbox() {
+  return <Checkbox name="checkbox" edge="start" size="small" checked />;
+});
 
 const IconButtonWithProgress = forwardRef(function IconButtonWithProgress(
   props: IconButtonProps,
