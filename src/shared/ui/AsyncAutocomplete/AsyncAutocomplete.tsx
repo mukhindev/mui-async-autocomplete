@@ -45,6 +45,7 @@ interface AsyncAutocompleteProps<
   /** freeSolo */
   F extends boolean = false,
 > extends Partial<AutocompleteProps<T, M, C, F>> {
+  "data-component"?: string;
   name?: string;
   label?: string;
   placeholder?: string;
@@ -67,6 +68,7 @@ export default function AsyncAutocomplete<
   type Props = AutocompleteProps<T, M, C, F>;
 
   const {
+    "data-component": dataComponent,
     name,
     label,
     placeholder,
@@ -341,7 +343,11 @@ export default function AsyncAutocomplete<
 
   return (
     <Autocomplete
-      data-compoenent="AsyncAutocomplete"
+      data-compoenent={
+        dataComponent
+          ? `AsyncAutocomplete/${dataComponent}`
+          : "AsyncAutocomplete"
+      }
       multiple={multiple}
       value={value}
       options={mixedOptions}
