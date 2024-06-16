@@ -1,8 +1,11 @@
 import {
   Autocomplete,
+  AutocompleteFreeSoloValueMapping,
   AutocompleteProps,
   AutocompleteRenderInputParams,
+  AutocompleteRenderOptionState,
   Box,
+  Button,
   Checkbox,
   CircularProgress,
   IconButton,
@@ -12,12 +15,15 @@ import {
 import {
   ForwardedRef,
   forwardRef,
+  LiHTMLAttributes,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+
+const _optionCreateSymbol = Symbol();
 
 export type OptionsRequestParams = {
   name?: string;
@@ -41,8 +47,13 @@ interface AsyncAutocompleteProps<
   name?: string;
   label?: string;
   placeholder?: string;
-  inProgress?: string;
+  inProgress?: boolean;
+  /** Предлагать создание новой опции если onOptionsRequest не вернул результат при поиске */
+  creatable?: boolean;
+  /** Событие запроса опций при открытии меню и поиске */
   onOptionsRequest?: OptionsRequest<T>;
+  /** Событие создания новой опции **/
+  onOptionCreate?: OptionsRequest<T>;
 }
 
 /** Надстройка над Mui Autocomplete, облегчающая работу с асинхронными данными */
@@ -61,11 +72,15 @@ export default function AsyncAutocomplete<
     options = [],
     value,
     multiple,
+    creatable,
+    getOptionLabel,
     isOptionEqualToValue,
-    inProgress,
+    filterOptions,
+    inProgress = false,
     onInputChange,
     onOpen,
     onOptionsRequest,
+    onOptionCreate,
     ...autocompleteProps
   } = props;
 
@@ -77,7 +92,7 @@ export default function AsyncAutocomplete<
   const [isRequestInProgress, setIsRequestInProgress] = useState(false);
 
   /** Микс из опций обычный, запрошенных и отсутствующих (текущие значения вне опций) */
-  const mixedOptions = useMemo(() => {
+  const mixedOptions = useMemo<T[]>(() => {
     const propsAndRequestedOptions = [...options, ...requestedOptions];
 
     if (value !== null) {
@@ -104,6 +119,46 @@ export default function AsyncAutocomplete<
 
     return propsAndRequestedOptions;
   }, [value, options, requestedOptions, isOptionEqualToValue]);
+
+  /** Извлечение лейбла для опции */
+  const handleOptionLabel = useCallback(
+    (option: T | AutocompleteFreeSoloValueMapping<F>) => {
+      // Системные опции интегрируются через symbol
+      if (typeof option === "symbol") {
+        return "";
+      }
+
+      // Извлечение лейбла методом getOptionLabel
+      if (getOptionLabel) {
+        return getOptionLabel(option);
+      }
+
+      // Если getOptionLabel не передан и опция это строка, выводить как есть
+      else if (typeof option === "string") {
+        return option;
+      }
+
+      // Если getOptionLabel не передан и опция это число, привести к строке
+      else if (typeof option === "number") {
+        return option.toString();
+      }
+
+      return "";
+    },
+    [getOptionLabel],
+  );
+
+  /** Проверка полного совпадения с поиском (нужно для режима создания новый опций) */
+  const isProposalToCreate = useMemo<boolean>(() => {
+    // Не актуально без флага creatable
+    if (!creatable || !debouncedSearch || !search) {
+      return false;
+    }
+
+    const allLabels = mixedOptions.map((option) => handleOptionLabel(option));
+
+    return !allLabels.includes(debouncedSearch);
+  }, [creatable, mixedOptions, search, debouncedSearch, handleOptionLabel]);
 
   const onOptionsRequestRef = useRef(onOptionsRequest);
   onOptionsRequestRef.current = onOptionsRequest;
@@ -179,6 +234,13 @@ export default function AsyncAutocomplete<
     }
   };
 
+  const handleOptionCreate = useCallback(() => {
+    onOptionCreate?.({
+      name,
+      search,
+    });
+  }, [name, onOptionCreate, search]);
+
   const renderInput = useCallback(
     (params: AutocompleteRenderInputParams) => {
       return (
@@ -193,9 +255,95 @@ export default function AsyncAutocomplete<
     [name, label, placeholder],
   );
 
+  const renderOption = useCallback(
+    (
+      params: LiHTMLAttributes<HTMLLIElement>,
+      option: T,
+      { selected }: AutocompleteRenderOptionState,
+    ) => {
+      const { id, ...liProps } = params;
+
+      // Отрисовка служебного элемента списка о создании новой опции
+      if (option === _optionCreateSymbol) {
+        return (
+          <Box
+            key={id}
+            component="li"
+            className={liProps.className}
+            sx={{ cursor: "default !important" }}
+          >
+            <Button
+              variant="outlined"
+              onClick={handleOptionCreate}
+              disabled={inProgress || isRequestInProgress}
+              sx={{
+                textTransform: "inherit",
+                pl: 1,
+                pr: 1,
+                pt: 0.25,
+                pb: 0.25,
+                width: "100%",
+                textAlign: "left",
+                justifyContent: "start",
+              }}
+            >
+              Создать: {search}
+            </Button>
+          </Box>
+        );
+      }
+
+      return (
+        <Box component="li" {...liProps} key={id}>
+          {multiple && (
+            <Box
+              key={id}
+              sx={{
+                height: 0,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <Checkbox
+                name="checkbox"
+                edge="start"
+                size="small"
+                checked={selected}
+              />
+            </Box>
+          )}
+          {handleOptionLabel(option)}
+        </Box>
+      );
+    },
+    [
+      multiple,
+      handleOptionLabel,
+      handleOptionCreate,
+      inProgress,
+      isRequestInProgress,
+      search,
+    ],
+  );
+
+  const handleOptionsFilter: Props["filterOptions"] = (options, state) => {
+    const renderedOptions: T[] = [];
+
+    if (isProposalToCreate) {
+      // Естественно createSymbol не является T, хак для внутренней реализации инъекции в список опций
+      renderedOptions.push(_optionCreateSymbol as T);
+    }
+
+    return renderedOptions.concat(
+      filterOptions ? filterOptions(options, state) : options,
+    );
+  };
+
   return (
     <Autocomplete
-      renderInput={renderInput}
+      data-compoenent="AsyncAutocomplete"
+      multiple={multiple}
+      value={value}
       options={mixedOptions}
       noOptionsText={
         isRequestInProgress
@@ -204,42 +352,18 @@ export default function AsyncAutocomplete<
             ? "Не найдено"
             : "Нет опций"
       }
-      multiple={multiple}
       slotProps={{
         popupIndicator:
           inProgress || isRequestInProgress
             ? { component: IconButtonWithProgress }
             : undefined,
       }}
-      value={value}
+      getOptionLabel={handleOptionLabel}
+      filterOptions={handleOptionsFilter}
       isOptionEqualToValue={isOptionEqualToValue}
+      renderInput={renderInput}
+      renderOption={renderOption}
       onInputChange={handleInputChange}
-      renderOption={(params, option, { selected }) => {
-        const { id, ...liProps } = params;
-
-        return (
-          <li {...liProps} key={id}>
-            {multiple && (
-              <Box
-                key={id}
-                sx={{
-                  height: 0,
-                  display: "flex",
-                  alignItems: "center",
-                }}
-              >
-                <Checkbox
-                  name="checkbox"
-                  edge="start"
-                  size="small"
-                  checked={selected}
-                />
-              </Box>
-            )}
-            {props.getOptionLabel?.(option)}
-          </li>
-        );
-      }}
       onOpen={handleOpen}
       {...autocompleteProps}
     />

@@ -70,6 +70,7 @@ export default function App() {
     <Stack direction="row" flexWrap="wrap" gap={3}>
       <AsyncAutocomplete
         name="single"
+        creatable
         label="Одиночный"
         size="small"
         sx={{ width: 240 }}
@@ -94,12 +95,12 @@ export default function App() {
       />
       <AsyncAutocomplete
         name="simple"
+        creatable
         label="Простое значение"
         size="small"
         sx={{ width: 240 }}
         value={simpleValue}
         options={["A", "Б", "В"]}
-        getOptionLabel={(option) => option}
         isOptionEqualToValue={(option, value) => option === value}
         onChange={(_, value) => setSimpleValue(value)}
       />
