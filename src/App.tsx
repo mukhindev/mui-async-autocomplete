@@ -55,7 +55,7 @@ export default function App() {
     const options = await res.json();
 
     // Имитация долгого запроса
-    await delay(2000);
+    await delay(500);
 
     // Сохранить в кеш если не запрос на поиск
     if (!search) {
@@ -70,7 +70,6 @@ export default function App() {
     <Stack direction="row" flexWrap="wrap" gap={3}>
       <AsyncAutocomplete
         name="single"
-        creatable
         label="Одиночный"
         size="small"
         sx={{ width: 240 }}

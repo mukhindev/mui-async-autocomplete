@@ -23,7 +23,7 @@ import {
   useState,
 } from "react";
 
-const _optionCreateSymbol = Symbol();
+const OPTION_CREATE_SYMBOL = Symbol();
 
 export type OptionsRequestParams = {
   name?: string;
@@ -264,7 +264,7 @@ export default function AsyncAutocomplete<
       const { id, ...liProps } = params;
 
       // Отрисовка служебного элемента списка о создании новой опции
-      if (option === _optionCreateSymbol) {
+      if (option === OPTION_CREATE_SYMBOL) {
         return (
           <Box
             key={id}
@@ -327,15 +327,24 @@ export default function AsyncAutocomplete<
   );
 
   const handleOptionsFilter: Props["filterOptions"] = (options, state) => {
+    const { inputValue } = state;
     const renderedOptions: T[] = [];
 
     if (isProposalToCreate) {
-      // Естественно createSymbol не является T, хак для внутренней реализации инъекции в список опций
-      renderedOptions.push(_optionCreateSymbol as T);
+      // Естественно OPTION_CREATE_SYMBOL не является T, хак для внутренней реализации инъекции в список опций
+      renderedOptions.push(OPTION_CREATE_SYMBOL as T);
     }
 
     return renderedOptions.concat(
-      filterOptions ? filterOptions(options, state) : options,
+      filterOptions
+        ? // Кастомный фильтр переданные сверху
+          filterOptions(options, state)
+        : // Фильтр по-умолчанию
+          options.filter((option) =>
+            handleOptionLabel(option)
+              .toLocaleLowerCase()
+              .includes(inputValue.toLocaleLowerCase()),
+          ),
     );
   };
 
