@@ -1,6 +1,4 @@
-import AsyncAutocomplete, {
-  OptionsRequestParams,
-} from "./shared/ui/AsyncAutocomplete";
+import AsyncAutocomplete, { OptionsRequestParams } from "../lib";
 import { useRef, useState } from "react";
 import { Stack } from "@mui/material";
 
@@ -73,6 +71,10 @@ export default function App() {
         label="Одиночный"
         size="small"
         sx={{ width: 240 }}
+        isOptionsPrefetch
+        onOptionsPrefetch={(options) => {
+          setValue(options[0]);
+        }}
         value={value}
         getOptionLabel={(option) => option.title}
         isOptionEqualToValue={(option, value) => option.title === value.title}

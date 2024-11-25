@@ -14,8 +14,10 @@ import {
 } from "@mui/material";
 import {
   ForwardedRef,
-  forwardRef,
+  Fragment,
   LiHTMLAttributes,
+  ReactNode,
+  forwardRef,
   memo,
   useCallback,
   useEffect,
@@ -36,7 +38,7 @@ export type OptionsRequest<T> = (
   params: OptionsRequestParams,
 ) => (T[] | void) | Promise<T[] | void>;
 
-interface AsyncAutocompleteProps<
+export interface AsyncAutocompleteProps<
   T,
   /** multiple */
   M extends boolean = false,
@@ -49,13 +51,51 @@ interface AsyncAutocompleteProps<
   name?: string;
   label?: string;
   placeholder?: string;
+  required?: boolean;
+  /**
+   * Вариант для встраивания без лейбла и обводки (например в ячейку таблицы).
+   * Ваша MUI тема должна иметь переопределение (styleOverrides) "&.variant_inner" для MuiTextField
+   *
+   * Например такое:
+   *
+   * ```JavaScript
+   * {
+   *   MuiTextField: {
+   *     styleOverrides: {
+   *       root: {
+   *         // Переопределение для inner варианта
+   *         "&.variant_inner": {
+   *           // Прячем label
+   *           ".MuiInputLabel-root": {
+   *             visibility: "hidden",
+   *           },
+   *           // Убираем обводку
+   *           fieldset: {
+   *             border: "none",
+   *           },
+   *         },
+   *       },
+   *     },
+   *   },
+   * }
+   * ```
+   * */
+  inner?: boolean;
   inProgress?: boolean;
   /** Предлагать создание новой опции если onOptionsRequest не вернул результат при поиске */
   creatable?: boolean;
+  /** Запретить запросы при поиске */
+  disableSearchOptionsRequest?: boolean;
+  /** Предварительное получение опций как только компонент монтирован, не ждать первого открытия */
+  isOptionsPrefetch?: boolean;
+  /** Событие при предварительном получении опций  */
+  onOptionsPrefetch?: (options: T[]) => void;
   /** Событие запроса опций при открытии меню и поиске */
   onOptionsRequest?: OptionsRequest<T>;
   /** Событие создания новой опции **/
   onOptionCreate?: OptionsRequest<T>;
+  renderBeforeOptionLabel?: (option: T) => ReactNode;
+  renderAfterOptionLabel?: (option: T) => ReactNode;
 }
 
 /** Надстройка над Mui Autocomplete, облегчающая работу с асинхронными данными */
@@ -69,21 +109,30 @@ export default function AsyncAutocomplete<
 
   const {
     "data-component": dataComponent,
+    "aria-label": ariaLabel,
     name,
     label,
     placeholder,
+    required = false,
+    inner = false,
     options = [],
     value,
     multiple,
     creatable,
+    disableSearchOptionsRequest = false,
     getOptionLabel,
     isOptionEqualToValue,
     filterOptions,
     inProgress = false,
     onInputChange,
     onOpen,
+    isOptionsPrefetch = false,
+    onOptionsPrefetch,
     onOptionsRequest,
     onOptionCreate,
+    renderBeforeOptionLabel,
+    renderAfterOptionLabel,
+    sx,
     ...autocompleteProps
   } = props;
 
@@ -93,6 +142,10 @@ export default function AsyncAutocomplete<
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
   const [isRequestInProgress, setIsRequestInProgress] = useState(false);
+
+  const isPrefetchCompletedRef = useRef(false);
+  const onOptionsPrefetchRef = useRef(onOptionsPrefetch);
+  onOptionsPrefetchRef.current = onOptionsPrefetch;
 
   /** Микс из опций обычный, запрошенных и отсутствующих (текущие значения вне опций) */
   const mixedOptions = useMemo<T[]>(() => {
@@ -191,6 +244,7 @@ export default function AsyncAutocomplete<
 
         if (requestedOptions) {
           setRequestedOptions(requestedOptions);
+          return requestedOptions;
         }
       } catch {
         /* empty */
@@ -203,10 +257,23 @@ export default function AsyncAutocomplete<
 
   /** Запрос дополнительных опций при поиске */
   useEffect(() => {
-    if (debouncedSearch) {
+    if (!disableSearchOptionsRequest && debouncedSearch) {
       handleOptionsRequest({ search: debouncedSearch });
     }
-  }, [debouncedSearch, handleOptionsRequest]);
+  }, [debouncedSearch, disableSearchOptionsRequest, handleOptionsRequest]);
+
+  /** Предварительное получение опций и вызов связанного события */
+  useEffect(() => {
+    if (isOptionsPrefetch && !isPrefetchCompletedRef.current) {
+      handleOptionsRequest({ search: "" }).then((options) => {
+        if (options) {
+          onOptionsPrefetchRef.current?.(options);
+        }
+      });
+
+      isPrefetchCompletedRef.current = true;
+    }
+  }, [handleOptionsRequest, isOptionsPrefetch]);
 
   /** Обработка поля ввода */
   const handleInputChange: Props["onInputChange"] = (evt, value, reason) => {
@@ -249,13 +316,16 @@ export default function AsyncAutocomplete<
       return (
         <TextField
           {...params}
+          className={inner ? "variant_inner" : undefined}
           name={name}
           label={label}
+          aria-label={ariaLabel}
           placeholder={placeholder}
+          required={required}
         />
       );
     },
-    [name, label, placeholder],
+    [inner, name, label, ariaLabel, placeholder, required],
   );
 
   const renderOption = (
@@ -296,7 +366,7 @@ export default function AsyncAutocomplete<
     }
 
     return (
-      <Box component="li" {...liProps} key={id}>
+      <Box component="li" {...liProps} key={id} id={id}>
         {multiple && (
           <Box
             key={id}
@@ -314,7 +384,13 @@ export default function AsyncAutocomplete<
             {selected ? <MemoizedCheckedCheckbox /> : <MemoizedCheckbox />}
           </Box>
         )}
+        {renderBeforeOptionLabel && (
+          <Fragment key={id}>{renderBeforeOptionLabel(option)}</Fragment>
+        )}
         {handleOptionLabel(option)}
+        {renderAfterOptionLabel && (
+          <Fragment key={id}>{renderAfterOptionLabel(option)}</Fragment>
+        )}
       </Box>
     );
   };
@@ -335,7 +411,7 @@ export default function AsyncAutocomplete<
         : // Фильтр по-умолчанию
           options.filter((option) =>
             handleOptionLabel(option)
-              .toLocaleLowerCase()
+              ?.toLocaleLowerCase()
               .includes(inputValue.toLocaleLowerCase()),
           ),
     );
@@ -363,6 +439,13 @@ export default function AsyncAutocomplete<
           inProgress || isRequestInProgress
             ? { component: IconButtonWithProgress }
             : undefined,
+      }}
+      sx={{
+        // Слишком маленькое минимальная ширина поля ввода по-умолчанию у Autocomplete
+        "& .MuiAutocomplete-inputRoot .MuiAutocomplete-input": {
+          minWidth: 60,
+        },
+        ...sx,
       }}
       getOptionLabel={handleOptionLabel}
       filterOptions={handleOptionsFilter}

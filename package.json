@@ -1,18 +1,40 @@
 {
   "name": "@mukhindev/mui-async-autocomplete",
-  "private": true,
-  "version": "0.0.0",
+ "version": "1.0.0",
+  "author": "Sergey Mukhin <mukhindev@gmail.com>",
+  "description": "Extended MUI Autocomplete",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mukhindev/mui-async-autocomplete.git"
+  },
+  "keywords": [
+    "react",
+    "ui",
+    "mui",
+    "typescript"
+  ],
+  "license": "MIT",
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    }
+  },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "lint": "eslint lib --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "build": "rimraf ./dist && npx tsc --project tsconfig.lib.json"
   },
-  "dependencies": {
+  "peerDependencies": {
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.5",
-    "@mui/material": "^5.15.20",
+    "@mui/icons-material": "^6.1.7",
+    "@mui/material": "^6.1.7",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -25,7 +47,8 @@
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.6",
+    "rimraf": "^5.0.5",
     "typescript": "^5.2.2",
-    "vite": "^5.2.0"
+    "vite": "^5.4.9"
   }
 }
