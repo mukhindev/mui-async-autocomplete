@@ -1,4 +1,7 @@
-import AsyncAutocomplete, { OptionsRequestParams } from "../lib";
+import AsyncAutocomplete, {
+  AsyncAutocompleteMultipleWithNot,
+  OptionsRequestParams,
+} from "../lib";
 import { useRef, useState } from "react";
 import { Stack } from "@mui/material";
 
@@ -81,20 +84,27 @@ export default function App() {
         onOptionsRequest={handleOptionsRequest}
         onChange={(_, value) => setValue(value)}
       />
-      <AsyncAutocomplete
-        multiple
-        name="multi"
-        label="Мульти"
-        size="small"
-        sx={{ width: 480 }}
-        value={values}
-        disableCloseOnSelect
-        getOptionLabel={(option) => option.title}
-        isOptionEqualToValue={(option, value) => option.title === value.title}
-        getOptionKey={(option) => option.id}
-        onOptionsRequest={handleOptionsRequest}
-        onChange={(_, value) => setValues(value)}
-      />
+      <AsyncAutocompleteMultipleWithNot<TodoModel>
+        getId={(value) => value.id}
+        onNotChange={(options) => {
+          setValues(options);
+        }}
+      >
+        <AsyncAutocomplete
+          multiple
+          name="multi"
+          label="Мульти"
+          size="small"
+          sx={{ width: 480 }}
+          value={values}
+          disableCloseOnSelect
+          getOptionLabel={(option) => option.title}
+          isOptionEqualToValue={(option, value) => option.title === value.title}
+          getOptionKey={(option) => option.id}
+          onOptionsRequest={handleOptionsRequest}
+          onChange={(_, value) => setValues(value)}
+        />
+      </AsyncAutocompleteMultipleWithNot>
       <AsyncAutocomplete
         name="simple"
         creatable
