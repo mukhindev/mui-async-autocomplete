@@ -18,8 +18,8 @@ interface AsyncAutocompleteCurrentOptionLoaderProps<S> {
  *
  * ```JavaScript
  * <AsyncAutocompleteCurrentOptionLoader
- *   id={(filter[filterKey] as string) ?? null}
- *   onCurrentOptionRequest={onCurrentOptionRequest}
+ *   id={42}
+ *   onCurrentOptionRequest={handleCurrentOptionRequest}
  * >
  *   <AsyncAutocomplete />
  * </AsyncAutocompleteCurrentOptionLoader>
