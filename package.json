@@ -1,6 +1,6 @@
 {
   "name": "@mukhindev/mui-async-autocomplete",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Sergey Mukhin <mukhindev@gmail.com>",
   "description": "Extended MUI Autocomplete",
   "repository": {
@@ -21,8 +21,12 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "import": "./dist/index.js" },
-    "./wrappers": { "import": "./dist/wrappers/index.js" }
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./wrappers": {
+      "import": "./dist/wrappers/index.js"
+    }
   },
   "scripts": {
     "dev": "vite",
