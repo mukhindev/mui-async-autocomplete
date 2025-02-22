@@ -1,9 +1,7 @@
-import AsyncAutocomplete, {
-  AsyncAutocompleteMultipleWithNot,
-  OptionsRequestParams,
-} from "../lib";
+import AsyncAutocomplete, { OptionsRequestParams } from "../lib";
 import { useRef, useState } from "react";
 import { Stack } from "@mui/material";
+import { AsyncAutocompleteMultipleWithNot } from "../lib/wrappers";
 
 type TodoModel = {
   id: number;
@@ -75,9 +73,9 @@ export default function App() {
         size="small"
         sx={{ width: 240 }}
         isOptionsPrefetch
-        onOptionsPrefetch={(options) => {
-          setValue(options[0]);
-        }}
+        // onOptionsPrefetch={(options) => {
+        //   setValue(options[0]);
+        // }}
         value={value}
         getOptionLabel={(option) => option.title}
         isOptionEqualToValue={(option, value) => option.title === value.title}

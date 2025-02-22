@@ -19,12 +19,12 @@ interface AsyncAutocompleteCurrentOptionsLoaderProps<S> {
  * Например, в случаях, когда известны только ids, но нет самих моделей.
  *
  * ```JavaScript
- * <AsyncAutocompleteCurrentOptionLoader
+ * <AsyncAutocompleteCurrentOptionsLoader
  *   ids={[42, 43, 44]}
  *   onCurrentOptionsRequest={handleCurrentOptionsRequest}
  * >
  *   <AsyncAutocomplete />
- * </AsyncAutocompleteCurrentOptionLoader>
+ * </AsyncAutocompleteCurrentOptionsLoader>
  * ```
  * */
 export default function AsyncAutocompleteCurrentOptionsLoader<S>(
@@ -42,24 +42,29 @@ export default function AsyncAutocompleteCurrentOptionsLoader<S>(
   const onCurrentOptionRequestRef = useRef(onCurrentOptionsRequest);
   onCurrentOptionRequestRef.current = onCurrentOptionsRequest;
 
-  const abortControllerRef = useRef<AbortController>();
-
   // Получить текущие опцию по списку ids, если ещё не было получено
   useEffect(() => {
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
+    const abortController = new AbortController();
 
     if (ids?.length > 0 && !currentOptionsRef.current.length) {
       onCurrentOptionRequestRef
         .current({
           ids,
           name: nameRef.current,
-          signal: abortControllerRef.current.signal,
+          signal: abortController.signal,
         })
         .then((currentOptions) => {
           if (currentOptions) {
             setCurrentOptions(currentOptions);
           }
+        })
+        .catch((reason) => {
+          // Не выкидывать ошибку, если прервано сигналом
+          if (abortController.signal.aborted) {
+            return;
+          }
+
+          throw reason;
         });
     } else {
       setCurrentOptions([]);

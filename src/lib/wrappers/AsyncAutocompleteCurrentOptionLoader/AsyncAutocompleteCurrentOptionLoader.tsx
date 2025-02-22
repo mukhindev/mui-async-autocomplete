@@ -40,24 +40,29 @@ export default function AsyncAutocompleteCurrentOptionLoader<S>(
   const onCurrentOptionRequestRef = useRef(onCurrentOptionRequest);
   onCurrentOptionRequestRef.current = onCurrentOptionRequest;
 
-  const abortControllerRef = useRef<AbortController>();
-
   // Получить текущую опцию по id, если ещё не было получено
   useEffect(() => {
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
+    const abortController = new AbortController();
 
     if (id && !currentOptionRef.current) {
       onCurrentOptionRequestRef
         .current({
           id,
           name: nameRef.current,
-          signal: abortControllerRef.current.signal,
+          signal: abortController.signal,
         })
         .then((currentOption) => {
           if (currentOption) {
             setCurrentOption(currentOption);
           }
+        })
+        .catch((reason) => {
+          // Не выкидывать ошибку, если прервано сигналом
+          if (abortController.signal.aborted) {
+            return;
+          }
+
+          throw reason;
         });
     }
 

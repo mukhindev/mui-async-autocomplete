@@ -136,8 +136,6 @@ export default function AsyncAutocomplete<
     ...autocompleteProps
   } = props;
 
-  const abortControllerRef = useRef<AbortController>();
-
   const [requestedOptions, setRequestedOptions] = useState<T[]>([]);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
@@ -222,6 +220,7 @@ export default function AsyncAutocomplete<
   /** Асинхронное или синхронное получение дополнительных опций */
   const handleOptionsRequest = useCallback(
     async (params: { search: string }) => {
+      const abortController = new AbortController();
       const onOptionsRequest = onOptionsRequestRef.current;
 
       if (!onOptionsRequest) {
@@ -230,24 +229,26 @@ export default function AsyncAutocomplete<
 
       const { search } = params;
 
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = new AbortController();
-
       try {
         setIsRequestInProgress(true);
 
         const requestedOptions = await onOptionsRequest({
           name,
           search: search ? search : undefined,
-          signal: abortControllerRef.current?.signal,
+          signal: abortController.signal,
         });
 
         if (requestedOptions) {
           setRequestedOptions(requestedOptions);
           return requestedOptions;
         }
-      } catch {
-        /* empty */
+      } catch (reason) {
+        // Не выкидывать ошибку, если прервано сигналом
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        throw reason;
       } finally {
         setIsRequestInProgress(false);
       }
