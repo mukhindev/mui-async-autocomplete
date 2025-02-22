@@ -69,6 +69,10 @@ export default function AsyncAutocompleteCurrentOptionLoader<S>(
     if (!id) {
       setCurrentOption(null);
     }
+
+    return () => {
+      abortController.abort();
+    };
   }, [id]);
 
   const WrappedAsyncAutocomplete = children.type;
