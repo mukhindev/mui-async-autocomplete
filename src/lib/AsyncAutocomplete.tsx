@@ -300,13 +300,21 @@ export default function AsyncAutocomplete<
     }
   };
 
+  /** Открытие управляется без prop open */
   const handleOpen: Props["onOpen"] = (evt) => {
     onOpen?.(evt);
 
-    if (!isRequestInProgress) {
+    if (autocompleteProps.open === undefined && !isRequestInProgress) {
       handleOptionsRequest({ search: "" });
     }
   };
+
+  /** Открытие управляется через prop open */
+  useEffect(() => {
+    if (autocompleteProps.open) {
+      handleOptionsRequest({ search: "" });
+    }
+  }, [autocompleteProps.open, handleOptionsRequest]);
 
   const handleOptionCreate = useCallback(() => {
     onOptionCreate?.({
@@ -389,11 +397,15 @@ export default function AsyncAutocomplete<
           </Box>
         )}
         {renderBeforeOptionLabel && (
-          <Fragment key={id}>{renderBeforeOptionLabel(option)}</Fragment>
+          <Fragment key={`${id}-BeforeOptionLabel`}>
+            {renderBeforeOptionLabel(option)}
+          </Fragment>
         )}
         {handleOptionLabel(option)}
         {renderAfterOptionLabel && (
-          <Fragment key={id}>{renderAfterOptionLabel(option)}</Fragment>
+          <Fragment key={`${id}-AfterOptionLabel`}>
+            {renderAfterOptionLabel(option)}
+          </Fragment>
         )}
       </Box>
     );
