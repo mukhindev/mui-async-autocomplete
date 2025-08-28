@@ -36,7 +36,13 @@ export default function App() {
   const handleOptionsRequest = async ({
     search,
     signal,
+    reason,
   }: OptionsRequestParams) => {
+    // Запросы имеют причины вызова. Например, нажали "Выделить все"
+    if (reason === "select-all") {
+      // Что-то делаем
+    }
+
     // Забрать из кеша, если он есть и это не запрос на поиск
     if (
       lastCacheTimestamp.current &&
@@ -70,6 +76,7 @@ export default function App() {
       <AsyncAutocomplete
         name="single"
         label="Одиночный"
+        isShowSelectAll
         size="small"
         sx={{ width: 240 }}
         isOptionsPrefetch

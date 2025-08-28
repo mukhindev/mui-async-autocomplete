@@ -1,22 +1,32 @@
-import {
-  Autocomplete,
+import DoneAllOutlinedIcon from "@mui/icons-material/DoneAllOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import type {
   AutocompleteFreeSoloValueMapping,
   AutocompleteProps,
   AutocompleteRenderInputParams,
   AutocompleteRenderOptionState,
+  IconButtonProps,
+  TextFieldProps,
+} from "@mui/material";
+import {
+  Autocomplete,
   Box,
   Button,
   Checkbox,
   CircularProgress,
   IconButton,
-  IconButtonProps,
+  Paper,
   TextField,
+  Tooltip,
 } from "@mui/material";
-import {
+import type {
   ForwardedRef,
-  Fragment,
+  HTMLAttributes,
   LiHTMLAttributes,
   ReactNode,
+} from "react";
+import {
+  Fragment,
   forwardRef,
   memo,
   useCallback,
@@ -28,10 +38,19 @@ import {
 
 const OPTION_CREATE_SYMBOL = Symbol();
 
+export type OptionsRequestReason =
+  | "open"
+  | "prefetch"
+  | "search"
+  | "select-all"
+  | "create";
+
 export type OptionsRequestParams = {
   name?: string;
   search?: string;
+  reason: OptionsRequestReason;
   signal?: AbortSignal;
+  reset: () => void;
 };
 
 export type OptionsRequest<T> = (
@@ -81,21 +100,30 @@ export interface AsyncAutocompleteProps<
    * ```
    * */
   inner?: boolean;
+  /** Слот для дополнительных действий (слева от кнопки выпадающего списка) */
+  actions?: ReactNode;
   inProgress?: boolean;
   /** Предлагать создание новой опции если onOptionsRequest не вернул результат при поиске */
   creatable?: boolean;
+  /** Показывать кнопку "Выделить все" TODO: Лучше сделать возможность отобразить что-угодно в шапке списке */
+  isShowSelectAll?: boolean;
   /** Запретить запросы при поиске */
   disableSearchOptionsRequest?: boolean;
   /** Предварительное получение опций как только компонент монтирован, не ждать первого открытия */
   isOptionsPrefetch?: boolean;
-  /** Событие при предварительном получении опций  */
+  /** Событие при предварительном получении опций (сразу после работы onOptionsRequest) */
   onOptionsPrefetch?: (options: T[]) => void;
-  /** Событие запроса опций при открытии меню и поиске */
+  /**
+   * Событие запроса опций при открытии меню, поиске,
+   * а также при монтировании, если `isOptionsPrefetch: true`
+   * */
   onOptionsRequest?: OptionsRequest<T>;
   /** Событие создания новой опции **/
   onOptionCreate?: OptionsRequest<T>;
   renderBeforeOptionLabel?: (option: T) => ReactNode;
   renderAfterOptionLabel?: (option: T) => ReactNode;
+  error?: TextFieldProps["error"];
+  helperText?: TextFieldProps["helperText"];
 }
 
 /** Надстройка над Mui Autocomplete, облегчающая работу с асинхронными данными */
@@ -115,15 +143,18 @@ export default function AsyncAutocomplete<
     placeholder,
     required = false,
     inner = false,
+    actions,
     options = [],
     value,
     multiple,
     creatable,
+    isShowSelectAll = false,
     disableSearchOptionsRequest = false,
     getOptionLabel,
     isOptionEqualToValue,
     filterOptions,
     inProgress = false,
+    readOnly,
     onInputChange,
     onOpen,
     isOptionsPrefetch = false,
@@ -132,6 +163,8 @@ export default function AsyncAutocomplete<
     onOptionCreate,
     renderBeforeOptionLabel,
     renderAfterOptionLabel,
+    error,
+    helperText,
     sx,
     ...autocompleteProps
   } = props;
@@ -153,9 +186,12 @@ export default function AsyncAutocomplete<
 
     if (value !== null) {
       const isFound = (value: T) => {
-        return !!propsAndRequestedOptions.find((option) => {
-          return isOptionEqualToValue?.(option, value);
-        });
+        // !== undefined, так как может быть валидный 0
+        return (
+          propsAndRequestedOptions.find((option) => {
+            return isOptionEqualToValue?.(option, value);
+          }) !== undefined
+        );
       };
 
       if (!Array.isArray(value)) {
@@ -204,31 +240,37 @@ export default function AsyncAutocomplete<
     [getOptionLabel],
   );
 
-  /** Проверка полного совпадения с поиском (нужно для режима создания новый опций) */
+  /** Проверка, нет ли в лейблах опций полного совпадения с поиском (нужно для режима создания новой опций) */
   const isProposalToCreate = useMemo<boolean>(() => {
     // Не актуально без флага creatable
     if (!creatable || !debouncedSearch || !search) {
       return false;
     }
 
-    const allLabels = mixedOptions.map((option) => handleOptionLabel(option));
+    const allLabels = mixedOptions.map((option) =>
+      handleOptionLabel(option)?.toLowerCase(),
+    );
 
-    return !allLabels.includes(debouncedSearch);
+    return !allLabels.includes(debouncedSearch.toLowerCase());
   }, [creatable, mixedOptions, search, debouncedSearch, handleOptionLabel]);
 
   const onOptionsRequestRef = useRef(onOptionsRequest);
   onOptionsRequestRef.current = onOptionsRequest;
 
+  const handleRequestedOptionsReset = useCallback(() => {
+    setRequestedOptions([]);
+  }, []);
+
   /** Асинхронное или синхронное получение дополнительных опций */
   const handleOptionsRequest = useCallback(
-    async (params: { search: string }) => {
+    async (params: { search: string; reason: OptionsRequestReason }) => {
       const onOptionsRequest = onOptionsRequestRef.current;
 
       if (!onOptionsRequest) {
         return;
       }
 
-      const { search } = params;
+      const { search, reason } = params;
 
       abortControllerRef.current?.abort();
       abortControllerRef.current = new AbortController();
@@ -239,41 +281,41 @@ export default function AsyncAutocomplete<
         const requestedOptions = await onOptionsRequest({
           name,
           search: search ? search : undefined,
+          reason,
           signal: abortControllerRef.current?.signal,
+          reset: handleRequestedOptionsReset,
         });
 
         if (requestedOptions) {
           setRequestedOptions(requestedOptions);
           return requestedOptions;
         }
-      } catch (reason) {
-        if (abortControllerRef.current?.signal.aborted) {
-          return;
-        }
-
-        throw reason;
+      } catch {
+        /* empty */
       } finally {
         setIsRequestInProgress(false);
       }
     },
-    [name],
+    [handleRequestedOptionsReset, name],
   );
 
   /** Запрос дополнительных опций при поиске */
   useEffect(() => {
     if (!disableSearchOptionsRequest && debouncedSearch) {
-      handleOptionsRequest({ search: debouncedSearch });
+      handleOptionsRequest({ search: debouncedSearch, reason: "search" });
     }
   }, [debouncedSearch, disableSearchOptionsRequest, handleOptionsRequest]);
 
   /** Предварительное получение опций и вызов связанного события */
   useEffect(() => {
     if (isOptionsPrefetch && !isPrefetchCompletedRef.current) {
-      handleOptionsRequest({ search: "" }).then((options) => {
-        if (options) {
-          onOptionsPrefetchRef.current?.(options);
-        }
-      });
+      handleOptionsRequest({ search: "", reason: "prefetch" }).then(
+        (options) => {
+          if (options) {
+            onOptionsPrefetchRef.current?.(options);
+          }
+        },
+      );
 
       isPrefetchCompletedRef.current = true;
     }
@@ -291,11 +333,16 @@ export default function AsyncAutocomplete<
     // Удалён последний символ в поле ввода
     if (reason === "input" && !value) {
       setSearch("");
-      handleOptionsRequest({ search: "" });
+      handleOptionsRequest({ search: "", reason: "search" });
+    }
+
+    // Сброс ввода
+    if (reason === "reset") {
+      setSearch("");
     }
 
     // Выход из поля
-    if (reason === "reset") {
+    if (reason === "blur") {
       setSearch("");
     }
   };
@@ -305,23 +352,39 @@ export default function AsyncAutocomplete<
     onOpen?.(evt);
 
     if (autocompleteProps.open === undefined && !isRequestInProgress) {
-      handleOptionsRequest({ search: "" });
+      handleOptionsRequest({ search: "", reason: "open" });
     }
   };
 
   /** Открытие управляется через prop open */
   useEffect(() => {
     if (autocompleteProps.open) {
-      handleOptionsRequest({ search: "" });
+      handleOptionsRequest({ search: "", reason: "open" });
     }
   }, [autocompleteProps.open, handleOptionsRequest]);
 
-  const handleOptionCreate = useCallback(() => {
-    onOptionCreate?.({
-      name,
-      search,
+  /** Получение всех опций */
+  const handleSelectAll = useCallback(() => {
+    handleOptionsRequest({
+      search: debouncedSearch,
+      reason: "select-all",
     });
-  }, [name, onOptionCreate, search]);
+  }, [debouncedSearch, handleOptionsRequest]);
+
+  const handleOptionCreate = useCallback(async () => {
+    try {
+      setIsRequestInProgress(true);
+
+      await onOptionCreate?.({
+        name,
+        search,
+        reason: "create",
+        reset: handleRequestedOptionsReset,
+      });
+    } finally {
+      setIsRequestInProgress(false);
+    }
+  }, [handleRequestedOptionsReset, name, onOptionCreate, search]);
 
   const renderInput = useCallback(
     (params: AutocompleteRenderInputParams) => {
@@ -334,10 +397,46 @@ export default function AsyncAutocomplete<
           aria-label={ariaLabel}
           placeholder={placeholder}
           required={required}
+          error={error}
+          helperText={helperText}
+          slotProps={{
+            input: {
+              ...params.InputProps,
+              endAdornment: readOnly ? (
+                <>
+                  <Tooltip title="Только для чтения">
+                    <LockOutlinedIcon
+                      sx={{
+                        fontSize: 20,
+                        color: ({ palette }) => palette.text.secondary,
+                        mr: "-4px",
+                      }}
+                    />
+                  </Tooltip>
+                </>
+              ) : (
+                <>
+                  {actions}
+                  {params.InputProps.endAdornment}
+                </>
+              ),
+            },
+          }}
         />
       );
     },
-    [inner, name, label, ariaLabel, placeholder, required],
+    [
+      inner,
+      name,
+      label,
+      ariaLabel,
+      placeholder,
+      required,
+      error,
+      helperText,
+      readOnly,
+      actions,
+    ],
   );
 
   const renderOption = (
@@ -435,7 +534,7 @@ export default function AsyncAutocomplete<
 
   return (
     <Autocomplete
-      data-compoenent={
+      data-component={
         dataComponent
           ? `AsyncAutocomplete/${dataComponent}`
           : "AsyncAutocomplete"
@@ -456,10 +555,24 @@ export default function AsyncAutocomplete<
             ? { component: IconButtonWithProgress }
             : undefined,
       }}
+      slots={{
+        paper: isShowSelectAll
+          ? (props) => (
+              <PaperWithSelectAllButton
+                inProgress={inProgress || isRequestInProgress}
+                onSelectAll={handleSelectAll}
+                {...props}
+              />
+            )
+          : undefined,
+      }}
       sx={{
         // Слишком маленькое минимальная ширина поля ввода по-умолчанию у Autocomplete
         "& .MuiAutocomplete-inputRoot .MuiAutocomplete-input": {
           minWidth: 60,
+        },
+        "& .MuiInputBase-root": {
+          paddingRight: readOnly ? "14px !important" : undefined,
         },
         ...sx,
       }}
@@ -469,7 +582,8 @@ export default function AsyncAutocomplete<
       renderInput={renderInput}
       renderOption={renderOption}
       onInputChange={handleInputChange}
-      onOpen={handleOpen}
+      onOpen={readOnly ? undefined : handleOpen}
+      readOnly={readOnly}
       {...autocompleteProps}
     />
   );
@@ -505,6 +619,35 @@ const IconButtonWithProgress = forwardRef(function IconButtonWithProgress(
     </IconButton>
   );
 });
+
+/** Подложка под список, с кнопкой "Выделить все" */
+function PaperWithSelectAllButton(
+  props: HTMLAttributes<HTMLElement> & {
+    inProgress: boolean;
+    onSelectAll: () => void;
+  },
+) {
+  const { children, inProgress, onSelectAll, ...paperProps } = props;
+
+  return (
+    <Paper {...paperProps}>
+      <Button
+        variant="text"
+        color="primary"
+        disabled={inProgress}
+        startIcon={<DoneAllOutlinedIcon />}
+        sx={{ m: 1, mb: 0, flex: 1 }}
+        onMouseDown={(evt) => {
+          evt.preventDefault();
+        }}
+        onClick={onSelectAll}
+      >
+        Выделить все
+      </Button>
+      {children}
+    </Paper>
+  );
+}
 
 /** ==== Utils ==== */
 
