@@ -26,7 +26,8 @@
     },
     "./wrappers": {
       "import": "./dist/wrappers/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
     "dev": "vite",

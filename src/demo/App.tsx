@@ -83,6 +83,8 @@ export default function App() {
         // onOptionsPrefetch={(options) => {
         //   setValue(options[0]);
         // }}
+        // Использовать только серверный фильтр
+        // filterOptions={(options) => options}
         value={value}
         getOptionLabel={(option) => option.title}
         isOptionEqualToValue={(option, value) => option.title === value.title}
