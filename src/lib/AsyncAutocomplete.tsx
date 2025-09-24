@@ -109,6 +109,8 @@ export interface AsyncAutocompleteProps<
   isShowSelectAll?: boolean;
   /** Запретить запросы при поиске */
   disableSearchOptionsRequest?: boolean;
+  /** Запретить сбрасывать поиск в multiple режиме */
+  disableSearchResetInMultiple?: boolean;
   /** Предварительное получение опций как только компонент монтирован, не ждать первого открытия */
   isOptionsPrefetch?: boolean;
   /** Событие при предварительном получении опций (сразу после работы onOptionsRequest) */
@@ -150,6 +152,7 @@ export default function AsyncAutocomplete<
     creatable,
     isShowSelectAll = false,
     disableSearchOptionsRequest = false,
+    disableSearchResetInMultiple = false,
     getOptionLabel,
     isOptionEqualToValue,
     filterOptions,
@@ -337,7 +340,11 @@ export default function AsyncAutocomplete<
     }
 
     // Сброс ввода
-    if (reason === "reset") {
+    if (
+      reason === "reset" &&
+      // В multiple режиме не сбрасывать поиск, если disableSearchResetInMultiple == true
+      (!multiple || (multiple && !disableSearchResetInMultiple))
+    ) {
       setSearch("");
     }
 
@@ -540,6 +547,8 @@ export default function AsyncAutocomplete<
           : "AsyncAutocomplete"
       }
       multiple={multiple}
+      // Управляем полем ввода только в multiple режиме
+      inputValue={multiple ? search : undefined}
       value={value}
       options={mixedOptions}
       noOptionsText={

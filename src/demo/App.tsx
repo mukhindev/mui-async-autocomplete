@@ -105,6 +105,7 @@ export default function App() {
           sx={{ width: 480 }}
           value={values}
           disableCloseOnSelect
+          disableSearchResetInMultiple
           getOptionLabel={(option) => option.title}
           isOptionEqualToValue={(option, value) => option.title === value.title}
           getOptionKey={(option) => option.id}
