@@ -5,6 +5,7 @@ import type {
   AutocompleteProps,
   AutocompleteRenderInputParams,
   AutocompleteRenderOptionState,
+  FilterOptionsState,
   IconButtonProps,
   TextFieldProps,
 } from "@mui/material";
@@ -142,6 +143,7 @@ export default function AsyncAutocomplete<
     "aria-label": ariaLabel,
     name,
     label,
+    freeSolo,
     placeholder,
     required = false,
     inner = false,
@@ -517,27 +519,42 @@ export default function AsyncAutocomplete<
     );
   };
 
-  const handleOptionsFilter: Props["filterOptions"] = (options, state) => {
-    const { inputValue } = state;
-    const renderedOptions: T[] = [];
+  const handleOptionsFilter = useCallback<
+    (options: T[], state: FilterOptionsState<T>) => T[]
+  >(
+    (options, state) => {
+      const { inputValue } = state;
+      const renderedOptions: T[] = [];
+      let opts = options;
 
-    if (isProposalToCreate) {
-      // Естественно OPTION_CREATE_SYMBOL не является T, хак для внутренней реализации инъекции в список опций
-      renderedOptions.push(OPTION_CREATE_SYMBOL as T);
-    }
+      // В режиме freeSolo не показывать опции, если пользовать ввёл опцию полностью самостоятельно
+      if (freeSolo) {
+        opts = options.filter(
+          (option) =>
+            handleOptionLabel(option)?.toLocaleLowerCase() !==
+            state.inputValue.toLowerCase(),
+        );
+      }
 
-    return renderedOptions.concat(
-      filterOptions
-        ? // Кастомный фильтр переданные сверху
-          filterOptions(options, state)
-        : // Фильтр по-умолчанию
-          options.filter((option) =>
-            handleOptionLabel(option)
-              ?.toLocaleLowerCase()
-              .includes(inputValue.toLocaleLowerCase()),
-          ),
-    );
-  };
+      if (isProposalToCreate) {
+        // Естественно OPTION_CREATE_SYMBOL не является T, хак для внутренней реализации инъекции в список опций
+        renderedOptions.push(OPTION_CREATE_SYMBOL as T);
+      }
+
+      return renderedOptions.concat(
+        filterOptions
+          ? // Кастомный фильтр переданные сверху
+            filterOptions(opts, state)
+          : // Фильтр по-умолчанию
+            opts.filter((option) =>
+              handleOptionLabel(option)
+                ?.toLocaleLowerCase()
+                .includes(inputValue.toLocaleLowerCase()),
+            ),
+      );
+    },
+    [filterOptions, freeSolo, handleOptionLabel, isProposalToCreate],
+  );
 
   return (
     <Autocomplete
@@ -547,6 +564,7 @@ export default function AsyncAutocomplete<
           : "AsyncAutocomplete"
       }
       multiple={multiple}
+      freeSolo={freeSolo}
       // Управляем полем ввода только в multiple режиме
       inputValue={multiple ? search : undefined}
       value={value}
