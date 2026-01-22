@@ -127,6 +127,11 @@ export interface AsyncAutocompleteProps<
   renderAfterOptionLabel?: (option: T) => ReactNode;
   error?: TextFieldProps["error"];
   helperText?: TextFieldProps["helperText"];
+  /**
+   * Заблокировать лейбла в верхнем положении
+   * (shrink на лейбле и notched на поле как true)
+   * */
+  isLabelAlwaysOnTop?: boolean;
 }
 
 /** Надстройка над Mui Autocomplete, облегчающая работу с асинхронными данными */
@@ -170,6 +175,7 @@ export default function AsyncAutocomplete<
     renderAfterOptionLabel,
     error,
     helperText,
+    isLabelAlwaysOnTop,
     sx,
     ...autocompleteProps
   } = props;
@@ -409,7 +415,11 @@ export default function AsyncAutocomplete<
           error={error}
           helperText={helperText}
           slotProps={{
+            inputLabel: {
+              shrink: isLabelAlwaysOnTop ? true : undefined,
+            },
             input: {
+              notched: isLabelAlwaysOnTop ? true : undefined,
               ...params.InputProps,
               endAdornment: readOnly ? (
                 <>

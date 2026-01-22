@@ -124,6 +124,19 @@ export default function App() {
         isOptionEqualToValue={(option, value) => option === value}
         onChange={(_, value) => setSimpleValue(value)}
       />
+      <AsyncAutocomplete
+        name="simple"
+        creatable
+        label="Лейбл всегда сверху"
+        isLabelAlwaysOnTop
+        actions={<button>42</button>}
+        size="small"
+        sx={{ width: 240 }}
+        value={null}
+        options={[]}
+        isOptionEqualToValue={(option, value) => option === value}
+        onChange={(_, value) => setSimpleValue(value)}
+      />
     </Stack>
   );
 }
