@@ -160,6 +160,7 @@ export default function AsyncAutocomplete<
     isShowSelectAll = false,
     disableSearchOptionsRequest = false,
     disableSearchResetInMultiple = false,
+    disableCloseOnSelect,
     getOptionLabel,
     isOptionEqualToValue,
     filterOptions,
@@ -621,6 +622,14 @@ export default function AsyncAutocomplete<
       onInputChange={handleInputChange}
       onOpen={readOnly ? undefined : handleOpen}
       readOnly={readOnly}
+      disableCloseOnSelect={
+        // Если режим multiple и не указан disableCloseOnSelect,
+        // то не закрывать дропдаун при выборе опции.
+        // Иначе, ориентироваться на только на disableCloseOnSelect
+        multiple && disableCloseOnSelect === undefined
+          ? true
+          : disableCloseOnSelect
+      }
       {...autocompleteProps}
     />
   );
